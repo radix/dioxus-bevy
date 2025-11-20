@@ -1,101 +1,57 @@
 use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
-#[derive(Debug, Clone, Routable, PartialEq)]
-#[rustfmt::skip]
-enum Route {
-    #[layout(Navbar)]
-    #[route("/")]
-    Home {},
-    #[route("/blog/:id")]
-    Blog { id: i32 },
-}
+use crate::generate_custom_mesh::{run_bevy_app, send_reset_rotation};
 
-const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-const HEADER_SVG: Asset = asset!("/assets/header.svg");
-const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+mod generate_custom_mesh;
 
 fn main() {
+    dioxus_logger::init(tracing::Level::INFO).expect("failed to init logger");
     dioxus::launch(App);
 }
+
+// declare the assets here in main.rs because for some reason calling asset!() in other modules is
+// giving errors about how `manganis` can't be found as a crate. !?
+pub const ARRAY_TEXTURE: Asset = asset!("assets/textures/array_texture.png");
 
 #[component]
 fn App() -> Element {
     rsx! {
-        document::Link { rel: "icon", href: FAVICON }
-        document::Link { rel: "stylesheet", href: MAIN_CSS } document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-        Router::<Route> {}
-    }
-}
-
-#[component]
-pub fn Hero() -> Element {
-    rsx! {
         div {
-            id: "hero",
-            img { src: HEADER_SVG, id: "header" }
-            div { id: "links",
-                a { href: "https://dioxuslabs.com/learn/0.7/", "📚 Learn Dioxus" }
-                a { href: "https://dioxuslabs.com/awesome", "🚀 Awesome Dioxus" }
-                a { href: "https://github.com/dioxus-community/", "📡 Community Libraries" }
-                a { href: "https://github.com/DioxusLabs/sdk", "⚙️ Dioxus Development Kit" }
-                a { href: "https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus", "💫 VSCode Extension" }
-                a { href: "https://discord.gg/XgGxMSkvUM", "👋 Community Discord" }
+            style: "width: 100vw; height: 100vh; margin: 0; padding: 0;",
+
+            // Dioxus UI overlay
+            div {
+                style: "position: absolute; top: 12px; left: 12px; z-index: 100; color: white; font-family: monospace; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px;",
+                "Dioxus + Bevy 3D Demo"
+                br {}
+                "Controls: Space: Change UVs, X/Y/Z: Rotate, R: Reset"
+                br {}
+                button {
+                    onclick: move |_|  send_reset_rotation(),
+                    style: "margin-top: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;",
+                    "Reset Rotation (Dioxus)"
+                }
             }
+
+            // Canvas for Bevy rendering
+            BevyExample {}
         }
     }
 }
 
-/// Home page
 #[component]
-fn Home() -> Element {
+fn BevyExample() -> Element {
+    use_effect(move || {
+        spawn_local(async {
+            run_bevy_app().await;
+        });
+    });
+
     rsx! {
-        Hero {}
-
-    }
-}
-
-/// Blog page
-#[component]
-pub fn Blog(id: i32) -> Element {
-    rsx! {
-        div {
-            id: "blog",
-
-            // Content
-            h1 { "This is blog #{id}!" }
-            p { "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components." }
-
-            // Navigation links
-            Link {
-                to: Route::Blog { id: id - 1 },
-                "Previous"
-            }
-            span { " <---> " }
-            Link {
-                to: Route::Blog { id: id + 1 },
-                "Next"
-            }
+        canvas {
+            id: "bevy-canvas",
+            style: "width: 100%; height: 100%; display: block;",
         }
-    }
-}
-
-/// Shared navbar component.
-#[component]
-fn Navbar() -> Element {
-    rsx! {
-        div {
-            id: "navbar",
-            Link {
-                to: Route::Home {},
-                "Home"
-            }
-            Link {
-                to: Route::Blog { id: 1 },
-                "Blog"
-            }
-        }
-
-        Outlet::<Route> {}
     }
 }
